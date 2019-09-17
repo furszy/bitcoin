@@ -452,7 +452,7 @@ std::optional<SelectionResult> SelectCoins(const CWallet& wallet, const std::vec
     for (const COutPoint& outpoint : vPresetInputs) {
         int input_bytes = -1;
         CTxOut txout;
-        std::map<uint256, CWalletTx>::const_iterator it = wallet.mapWallet.find(outpoint.hash);
+        const auto it = wallet.mapWallet.find(outpoint.hash);
         if (it != wallet.mapWallet.end()) {
             const CWalletTx& wtx = it->second;
             // Clearly invalid input, fail

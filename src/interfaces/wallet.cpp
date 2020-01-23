@@ -366,7 +366,7 @@ public:
         }
         return result;
     }
-    bool tryGetBalances(WalletBalances& balances, int& num_blocks, bool force, int cached_num_blocks) override
+    bool tryGetBalances(WalletBalances& balances, uint256& block_hash, bool force, uint256 cached_block_hash) override
     {
         auto locked_chain = m_wallet->chain().lock(true /* try_lock */);
         if (!locked_chain) return false;
@@ -374,8 +374,8 @@ public:
         if (!locked_wallet) {
             return false;
         }
-        num_blocks = m_wallet->GetLastBlockHeight();
-        if (!force && num_blocks == cached_num_blocks) return false;
+        block_hash = m_wallet->GetLastBlockHash();
+        if (!force && block_hash == cached_block_hash) return false;
         balances = getBalances();
         return true;
     }

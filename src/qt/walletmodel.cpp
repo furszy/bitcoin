@@ -45,7 +45,7 @@ WalletModel::WalletModel(std::unique_ptr<interfaces::Wallet> wallet, ClientModel
     transactionTableModel(nullptr),
     recentRequestsTableModel(nullptr),
     cachedEncryptionStatus(Unencrypted),
-    cachedNumBlocks(0)
+    m_cached_last_update_tip(uint256())
 {
     fHaveWatchOnly = m_wallet->haveWatchOnly();
     addressTableModel = new AddressTableModel(this);
@@ -84,15 +84,15 @@ void WalletModel::pollBalanceChanged()
     // holding the locks for a longer time - for example, during a wallet
     // rescan.
     interfaces::WalletBalances new_balances;
-    int numBlocks = -1;
-    if (!m_wallet->tryGetBalances(new_balances, numBlocks, fForceCheckBalanceChanged, cachedNumBlocks)) {
+    uint256 blockHash;
+    if (!m_wallet->tryGetBalances(new_balances, blockHash, fForceCheckBalanceChanged, m_cached_last_update_tip)) {
         return;
     }
 
     fForceCheckBalanceChanged = false;
 
     // Balance and number of transactions might have changed
-    cachedNumBlocks = numBlocks;
+    m_cached_last_update_tip = blockHash;
 
     checkBalanceChanged(new_balances);
     if(transactionTableModel)

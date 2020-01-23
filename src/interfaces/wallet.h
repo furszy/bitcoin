@@ -203,9 +203,9 @@ public:
 
     //! Get balances if possible without waiting for chain and wallet locks.
     virtual bool tryGetBalances(WalletBalances& balances,
-        int& num_blocks,
+        uint256& block_hash,
         bool force,
-        int cached_num_blocks) = 0;
+        uint256 cached_block_hash) = 0;
 
     //! Get balance.
     virtual CAmount getBalance() = 0;

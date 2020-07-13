@@ -701,6 +701,37 @@ RPCHelpMan simulaterawtransaction()
     };
 }
 
+static RPCHelpMan migratewallet()
+{
+    return RPCHelpMan{"migratewallet",
+        "\nEXPERIMENTAL warning: This call may not work as expected and may be changed in future releases\n"
+        "\nMigrate the wallet to a descriptor wallet.\n"
+        "A new wallet backup will need to be made.",
+        {},
+        RPCResult{RPCResult::Type::NONE, "", ""},
+        RPCExamples{
+            HelpExampleCli("migratewallet", "")
+            + HelpExampleRpc("migratewallet", "")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    if (!wallet) return NullUniValue;
+    CWallet* const pwallet = wallet.get();
+
+    EnsureWalletIsUnlocked(*pwallet);
+
+    WalletContext& context = EnsureWalletContext(request.context);
+
+    bilingual_str error;
+    if (!MigrateLegacyToDescriptor(*pwallet, context, error)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, error.original);
+    }
+    return NullUniValue;
+},
+    };
+}
+
 // addresses
 RPCHelpMan getaddressinfo();
 RPCHelpMan getnewaddress();
@@ -844,6 +875,7 @@ Span<const CRPCCommand> GetWalletRPCCommands()
         {"wallet", &walletpassphrase},
         {"wallet", &walletpassphrasechange},
         {"wallet", &walletprocesspsbt},
+        {"wallet", &migratewallet},
     };
     return commands;
 }

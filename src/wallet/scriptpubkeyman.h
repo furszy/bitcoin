@@ -516,6 +516,8 @@ public:
 
     /** Get the DescriptScriptPubKeyMans that have the same scriptPubKeys as this LegacyScriptPubKeyMan */
     std::optional<MigrationData> MigrateToDescriptor();
+    /** Delete all the records of this LegacyScriptPubKeyMan from disk */
+    bool DeleteRecords(bilingual_str& error);
 };
 
 /** Wraps a LegacyScriptPubKeyMan so that it can be returned in a new unique_ptr. Does not provide privkeys */

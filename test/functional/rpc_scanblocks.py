@@ -86,7 +86,7 @@ class ScanblocksTest(BitcoinTestFramework):
         assert_equal(node.scanblocks("abort"), False)
 
         # test invalid command
-        assert_raises_rpc_error(-8, "Invalid action argument", node.scanblocks, "foobar")
+        assert_raises_rpc_error(-8, "Invalid command", node.scanblocks, "foobar")
 
 
 if __name__ == '__main__':

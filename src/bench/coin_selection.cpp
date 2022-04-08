@@ -77,8 +77,9 @@ static void CoinSelection(benchmark::Bench& bench)
     bench.run([&] {
         auto result = AttemptSelection(wallet, 1003 * COIN, filter_standard, coins, coin_selection_params);
         assert(result);
-        assert(result->GetSelectedValue() == 1003 * COIN);
-        assert(result->GetInputSet().size() == 2);
+        auto obj = result.getObjResult();
+        assert(obj->GetSelectedValue() == 1003 * COIN);
+        assert(obj->GetInputSet().size() == 2);
     });
 }
 

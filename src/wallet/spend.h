@@ -66,7 +66,7 @@ std::vector<OutputGroup> GroupOutputs(const CWallet& wallet, const std::vector<C
  * returns                            If successful, a SelectionResult containing the input set
  *                                    If failed, a nullopt
  */
-std::optional<SelectionResult> AttemptSelection(const CWallet& wallet, const CAmount& nTargetValue, const CoinEligibilityFilter& eligibility_filter, std::vector<COutput> coins,
+CallResult<SelectionResult> AttemptSelection(const CWallet& wallet, const CAmount& nTargetValue, const CoinEligibilityFilter& eligibility_filter, std::vector<COutput> coins,
                         const CoinSelectionParams& coin_selection_params);
 
 /**
@@ -80,8 +80,8 @@ std::optional<SelectionResult> AttemptSelection(const CWallet& wallet, const CAm
  * returns                             If successful, a SelectionResult containing the selected coins
  *                                     If failed, a nullopt.
  */
-std::optional<SelectionResult> SelectCoins(const CWallet& wallet, const std::vector<COutput>& vAvailableCoins, const CAmount& nTargetValue, const CCoinControl& coin_control,
-                 const CoinSelectionParams& coin_selection_params) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet);
+CallResult<SelectionResult> SelectCoins(const CWallet& wallet, const std::vector<COutput>& vAvailableCoins, const CAmount& nTargetValue, const CCoinControl& coin_control,
+                    const CoinSelectionParams& coin_selection_params) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet);
 
 /**
  * Create a new transaction paying the recipients with a set of coins

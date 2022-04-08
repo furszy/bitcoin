@@ -375,8 +375,8 @@ std::vector<OutputGroup> GroupOutputs(const CWallet& wallet, const std::vector<C
     return groups_out;
 }
 
-std::optional<SelectionResult> AttemptSelection(const CWallet& wallet, const CAmount& nTargetValue, const CoinEligibilityFilter& eligibility_filter, std::vector<COutput> coins,
-                               const CoinSelectionParams& coin_selection_params)
+CallResult<SelectionResult> AttemptSelection(const CWallet& wallet, const CAmount& nTargetValue, const CoinEligibilityFilter& eligibility_filter, std::vector<COutput> coins,
+                                             const CoinSelectionParams& coin_selection_params)
 {
     // Vector of results. We will choose the best one based on waste.
     std::vector<SelectionResult> results;
@@ -409,16 +409,16 @@ std::optional<SelectionResult> AttemptSelection(const CWallet& wallet, const CAm
 
     if (results.size() == 0) {
         // No solution found
-        return std::nullopt;
+        return {};
     }
 
     // Choose the result with the least waste
     // If the waste is the same, choose the one which spends more inputs.
     auto& best_result = *std::min_element(results.begin(), results.end());
-    return best_result;
+    return {best_result};
 }
 
-std::optional<SelectionResult> SelectCoins(const CWallet& wallet, const std::vector<COutput>& vAvailableCoins, const CAmount& nTargetValue, const CCoinControl& coin_control, const CoinSelectionParams& coin_selection_params)
+CallResult<SelectionResult> SelectCoins(const CWallet& wallet, const std::vector<COutput>& vAvailableCoins, const CAmount& nTargetValue, const CCoinControl& coin_control, const CoinSelectionParams& coin_selection_params)
 {
     std::vector<COutput> vCoins(vAvailableCoins);
     CAmount value_to_select = nTargetValue;
@@ -437,8 +437,8 @@ std::optional<SelectionResult> SelectCoins(const CWallet& wallet, const std::vec
         }
         SelectionResult result(nTargetValue);
         result.AddInput(preset_inputs);
-        if (result.GetSelectedValue() < nTargetValue) return std::nullopt;
-        return result;
+        if (result.GetSelectedValue() < nTargetValue) return {};
+        return {result};
     }
 
     // calculate value from preset inputs and store them
@@ -454,14 +454,14 @@ std::optional<SelectionResult> SelectCoins(const CWallet& wallet, const std::vec
             const CWalletTx& wtx = it->second;
             // Clearly invalid input, fail
             if (wtx.tx->vout.size() <= outpoint.n) {
-                return std::nullopt;
+                return {};
             }
             input_bytes = GetTxSpendSize(wallet, wtx, outpoint.n, false);
             txout = wtx.tx->vout.at(outpoint.n);
         } else {
             // The input is external. We did not find the tx in mapWallet.
             if (!coin_control.GetExternalOutput(outpoint, txout)) {
-                return std::nullopt;
+                return {};
             }
             input_bytes = CalculateMaximumSignedInputSize(txout, &coin_control.m_external_provider, /*use_max_sig=*/true);
         }
@@ -471,7 +471,7 @@ std::optional<SelectionResult> SelectCoins(const CWallet& wallet, const std::vec
         }
 
         if (input_bytes == -1) {
-            return std::nullopt; // Not solvable, can't estimate size for fee
+            return {}; // Not solvable, can't estimate size for fee
         }
 
         /* Set some defaults for depth, spendable, solvable, safe, time, and from_me as these don't matter for preset inputs since no selection is being done. */
@@ -517,9 +517,9 @@ std::optional<SelectionResult> SelectCoins(const CWallet& wallet, const std::vec
     // Coin Selection attempts to select inputs from a pool of eligible UTXOs to fund the
     // transaction at a target feerate. If an attempt fails, more attempts may be made using a more
     // permissive CoinEligibilityFilter.
-    std::optional<SelectionResult> res = [&] {
+    CallResult<SelectionResult> res = [&] {
         // Pre-selected inputs already cover the target amount.
-        if (value_to_select <= 0) return std::make_optional(SelectionResult(nTargetValue));
+        if (value_to_select <= 0) return CallResult<SelectionResult>(SelectionResult(nTargetValue));
 
         // If possible, fund the transaction with confirmed UTXOs only. Prefer at least six
         // confirmations on outputs received from other wallets and only spend confirmed change.
@@ -566,15 +566,18 @@ std::optional<SelectionResult> SelectCoins(const CWallet& wallet, const std::vec
             }
         }
         // Coin Selection failed.
-        return std::optional<SelectionResult>();
+        return CallResult<SelectionResult>();
     }();
 
-    if (!res) return std::nullopt;
+    if (!res) {
+        return res;
+    }
 
     // Add preset inputs to result
-    res->AddInput(preset_inputs);
+    auto resMerged = *res.getObjResult();
+    resMerged.AddInput(preset_inputs);
 
-    return res;
+    return {resMerged};
 }
 
 static bool IsCurrentForAntiFeeSniping(interfaces::Chain& chain, const uint256& block_hash)
@@ -779,10 +782,13 @@ static OperationResult CreateTransactionInternal(
     AvailableCoins(wallet, vAvailableCoins, &coin_control, 1, MAX_MONEY, MAX_MONEY, 0);
 
     // Choose coins to use
-    std::optional<SelectionResult> result = SelectCoins(wallet, vAvailableCoins, /*nTargetValue=*/selection_target, coin_control, coin_selection_params);
-    if (!result) {
-        return errorOut(_("Insufficient funds"));
+    auto selectionRes = SelectCoins(wallet, vAvailableCoins, /*nTargetValue=*/selection_target, coin_control, coin_selection_params);
+    if (!selectionRes) {
+        bilingual_str extra_info;
+        if (!selectionRes.getError().empty()) extra_info = Untranslated(": ") + selectionRes.getError();
+        return errorOut(_("Insufficient funds") + extra_info);
     }
+    auto result = selectionRes.getObjResult();
 
     // Always make a change output
     // We will reduce the fee from this change output later, and remove the output if it is too small.

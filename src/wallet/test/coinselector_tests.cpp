@@ -729,7 +729,7 @@ BOOST_AUTO_TEST_CASE(SelectCoins_test)
         CCoinControl cc;
         const auto result = SelectCoins(*wallet, coins, target, cc, cs_params);
         BOOST_CHECK(result);
-        BOOST_CHECK_GE(result->GetSelectedValue(), target);
+        BOOST_CHECK_GE(result.getObjResult()->GetSelectedValue(), target);
     }
 }
 

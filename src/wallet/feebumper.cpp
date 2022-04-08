@@ -221,10 +221,10 @@ Result CreateRateBumpTransaction(CWallet& wallet, const uint256& txid, const CCo
     CTransactionRef tx_new;
     CAmount fee_ret;
     int change_pos_in_out = -1; // No requested location for change
-    bilingual_str fail_reason;
     FeeCalculation fee_calc_out;
-    if (!CreateTransaction(wallet, recipients, tx_new, fee_ret, change_pos_in_out, fail_reason, new_coin_control, fee_calc_out, false)) {
-        errors.push_back(Untranslated("Unable to create transaction.") + Untranslated(" ") + fail_reason);
+    auto res = CreateTransaction(wallet, recipients, tx_new, fee_ret, change_pos_in_out, new_coin_control, fee_calc_out, false);
+    if (!res) {
+        errors.push_back(Untranslated("Unable to create transaction.") + Untranslated(" ") + res.getError());
         return Result::WALLET_ERROR;
     }
 

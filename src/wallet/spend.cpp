@@ -557,12 +557,14 @@ CallResult<SelectionResult> SelectCoins(const CWallet& wallet, const std::vector
             // Try with unlimited ancestors/descendants. The transaction will still need to meet
             // mempool ancestor/descendant policy to be accepted to mempool and broadcasted, but
             // OutputGroups use heuristics that may overestimate ancestor/descendant counts.
-            if (!fRejectLongChains) {
-                if (auto r8{AttemptSelection(wallet, value_to_select,
-                                      CoinEligibilityFilter(0, 1, std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint64_t>::max(), true /* include_partial_groups */),
-                                      vCoins, coin_selection_params)}) {
-                    return r8;
+            if (auto r8{AttemptSelection(wallet, value_to_select,
+                                         CoinEligibilityFilter(0, 1, std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint64_t>::max(), true /* include_partial_groups */),
+                                         vCoins, coin_selection_params)}) {
+                if (fRejectLongChains) {
+                    // Return a "you have money, but the wallet can't create a valid transaction right now".
+                    return CallResult<SelectionResult>(_("Unconfirmed UTXOs, cannot create the transaction until them are confirmed"));
                 }
+                return r8;
             }
         }
         // Coin Selection failed.

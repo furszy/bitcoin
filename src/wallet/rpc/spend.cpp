@@ -156,13 +156,12 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
 
     // Send
     constexpr int RANDOM_CHANGE_POSITION = -1;
-    bilingual_str error;
     FeeCalculation fee_calc_out;
-    std::optional<CreatedTransactionResult> txr = CreateTransaction(wallet, recipients, RANDOM_CHANGE_POSITION, error, coin_control, fee_calc_out, true);
-    if (!txr) {
-        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, error.original);
+    auto res = CreateTransaction(wallet, recipients, RANDOM_CHANGE_POSITION, coin_control, fee_calc_out, true);
+    if (!res) {
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, res.GetError().original);
     }
-    CTransactionRef tx = txr->tx;
+    const CTransactionRef& tx = res.GetObjResult()->tx;
     wallet.CommitTransaction(tx, std::move(map_value), {} /* orderForm */);
     if (verbose) {
         UniValue entry(UniValue::VOBJ);

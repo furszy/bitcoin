@@ -96,6 +96,7 @@ void AvailableCoins(const CWallet& wallet, std::vector<COutput>& vCoins, const C
     const int min_depth = {coinControl ? coinControl->m_min_depth : DEFAULT_MIN_DEPTH};
     const int max_depth = {coinControl ? coinControl->m_max_depth : DEFAULT_MAX_DEPTH};
     const bool only_safe = {coinControl ? !coinControl->m_include_unsafe_inputs : true};
+    const bool only_spendable = {coinControl ? coinControl->m_include_only_spendable_outputs : false};
 
     std::set<uint256> trusted_parents;
     for (const auto& entry : wallet.mapWallet)
@@ -190,6 +191,10 @@ void AvailableCoins(const CWallet& wallet, std::vector<COutput>& vCoins, const C
 
             bool solvable = provider ? IsSolvable(*provider, wtx.tx->vout[i].scriptPubKey) : false;
             bool spendable = ((mine & ISMINE_SPENDABLE) != ISMINE_NO) || (((mine & ISMINE_WATCH_ONLY) != ISMINE_NO) && (coinControl && coinControl->fAllowWatchOnly && solvable));
+
+            // Filter by spendable outputs only
+            if (!spendable && only_spendable) continue;
+
             int input_bytes = GetTxSpendSize(wallet, wtx, i, (coinControl && coinControl->fAllowWatchOnly));
 
             vCoins.emplace_back(COutPoint(wtx.GetHash(), i), wtx.tx->vout.at(i), nDepth, input_bytes, spendable, solvable, safeTx, wtx.GetTxTime(), tx_from_me, feerate);

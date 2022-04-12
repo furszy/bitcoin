@@ -37,6 +37,8 @@ public:
     bool m_add_inputs = true;
     //! If false, only safe inputs will be used
     bool m_include_unsafe_inputs = false;
+    //! If true, only outputs spendable by the wallet will be included.
+    bool m_include_only_spendable_outputs = false;
     //! If false, allows unselected inputs, but requires all selected inputs be used
     bool fAllowOtherInputs = false;
     //! Includes watch only addresses which are solvable

@@ -291,6 +291,9 @@ bool SendCoinsDialog::PrepareSendText(QString& question_string, QString& informa
 
     updateCoinControlState();
 
+    // Only include spendable outputs
+    m_coin_control->m_include_only_spendable_outputs = true;
+
     prepareStatus = model->prepareTransaction(*m_current_transaction, *m_coin_control);
 
     // process prepareStatus and on error generate message shown to user

@@ -475,15 +475,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             return true;
         }
         if (strType == DBKeys::NAME) {
-            std::string strAddress;
-            ssKey >> strAddress;
-            std::string label;
-            ssValue >> label;
-            pwallet->m_address_book[DecodeDestination(strAddress)].SetLabel(label);
         } else if (strType == DBKeys::PURPOSE) {
-            std::string strAddress;
-            ssKey >> strAddress;
-            ssValue >> pwallet->m_address_book[DecodeDestination(strAddress)].purpose;
         } else if (strType == DBKeys::TX) {
             uint256 hash;
             ssKey >> hash;
@@ -557,11 +549,6 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         } else if (strType == DBKeys::ORDERPOSNEXT) {
             ssValue >> pwallet->nOrderPosNext;
         } else if (strType == DBKeys::DESTDATA) {
-            std::string strAddress, strKey, strValue;
-            ssKey >> strAddress;
-            ssKey >> strKey;
-            ssValue >> strValue;
-            pwallet->LoadDestData(DecodeDestination(strAddress), strKey, strValue);
         } else if (strType == DBKeys::HDCHAIN) {
         } else if (strType == DBKeys::OLD_KEY) {
             strErr = "Found unsupported 'wkey' record, try loading with version 0.18";
@@ -1052,6 +1039,47 @@ static DBErrors LoadDescriptorWalletRecords(CWallet* pwallet, DatabaseBatch& bat
     return desc_res.m_result;
 }
 
+static DBErrors LoadAddressBookRecords(CWallet* pwallet, DatabaseBatch& batch) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet)
+{
+    AssertLockHeld(pwallet->cs_wallet);
+
+    // Load name record
+    LoadResult name_res = LoadRecords(pwallet, batch, DBKeys::NAME,
+        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) {
+        std::string strAddress;
+        key >> strAddress;
+        std::string label;
+        value >> label;
+        pwallet->m_address_book[DecodeDestination(strAddress)].SetLabel(label);
+        return DBErrors::LOAD_OK;
+    });
+    if (name_res.m_result != DBErrors::LOAD_OK) return name_res.m_result;
+
+    // Load purpose record
+    LoadResult purpose_res = LoadRecords(pwallet, batch, DBKeys::PURPOSE,
+        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) {
+        std::string strAddress;
+        key >> strAddress;
+        value >> pwallet->m_address_book[DecodeDestination(strAddress)].purpose;
+        return DBErrors::LOAD_OK;
+    });
+    if (purpose_res.m_result != DBErrors::LOAD_OK) return purpose_res.m_result;
+
+    // Load destination data record
+    LoadResult dest_res = LoadRecords(pwallet, batch, DBKeys::DESTDATA,
+        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) {
+        std::string strAddress, strKey, strValue;
+        key >> strAddress;
+        key >> strKey;
+        value >> strValue;
+        pwallet->LoadDestData(DecodeDestination(strAddress), strKey, strValue);
+        return DBErrors::LOAD_OK;
+    });
+    if (dest_res.m_result != DBErrors::LOAD_OK) return dest_res.m_result;
+
+    return DBErrors::LOAD_OK;
+}
+
 DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
 {
     CWalletScanState wss;
@@ -1087,6 +1115,9 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
 
         // Load descriptors
         result = std::max(LoadDescriptorWalletRecords(pwallet, *m_batch), result);
+
+        // Load address book
+        result = std::max(LoadAddressBookRecords(pwallet, *m_batch), result);
 
         // Get cursor
         std::unique_ptr<DatabaseCursor> cursor = m_batch->GetNewCursor();

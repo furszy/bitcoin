@@ -303,6 +303,8 @@ std::unique_ptr<WalletDatabase> CreateDummyWalletDatabase();
 /** Return object for accessing temporary in-memory database. */
 std::unique_ptr<WalletDatabase> CreateMockWalletDatabase(DatabaseOptions& options);
 std::unique_ptr<WalletDatabase> CreateMockWalletDatabase();
+
+bool LoadKey(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue, std::string& strErr);
 } // namespace wallet
 
 #endif // BITCOIN_WALLET_WALLETDB_H

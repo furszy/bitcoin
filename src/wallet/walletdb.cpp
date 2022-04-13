@@ -449,6 +449,15 @@ bool LoadEncryptionKey(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValu
     return true;
 }
 
+bool LoadHDChain(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue, std::string& strErr)
+{
+    LOCK(pwallet->cs_wallet);
+    CHDChain chain;
+    ssValue >> chain;
+    pwallet->GetOrCreateLegacyScriptPubKeyMan()->LoadHDChain(chain);
+    return true;
+}
+
 static bool
 ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
              CWalletScanState &wss, std::string& strType, std::string& strErr, const KeyFilterFn& filter_fn = nullptr) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet)
@@ -645,9 +654,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             ssValue >> strValue;
             pwallet->LoadDestData(DecodeDestination(strAddress), strKey, strValue);
         } else if (strType == DBKeys::HDCHAIN) {
-            CHDChain chain;
-            ssValue >> chain;
-            pwallet->GetOrCreateLegacyScriptPubKeyMan()->LoadHDChain(chain);
+            if (!LoadHDChain(pwallet, ssKey, ssValue, strErr)) return false;
         } else if (strType == DBKeys::OLD_KEY) {
             strErr = "Found unsupported 'wkey' record, try loading with version 0.18";
             return false;

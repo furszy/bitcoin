@@ -508,18 +508,6 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             strErr = "Found unsupported 'wkey' record, try loading with version 0.18";
             return false;
         } else if (strType == DBKeys::ACTIVEEXTERNALSPK || strType == DBKeys::ACTIVEINTERNALSPK) {
-            uint8_t type;
-            ssKey >> type;
-            uint256 id;
-            ssValue >> id;
-
-            bool internal = strType == DBKeys::ACTIVEINTERNALSPK;
-            auto& spk_mans = internal ? wss.m_active_internal_spks : wss.m_active_external_spks;
-            if (spk_mans.count(static_cast<OutputType>(type)) > 0) {
-                strErr = "Multiple ScriptPubKeyMans specified for a single type";
-                return false;
-            }
-            spk_mans[static_cast<OutputType>(type)] = id;
         } else if (strType == DBKeys::WALLETDESCRIPTOR) {
         } else if (strType == DBKeys::WALLETDESCRIPTORCACHE) {
         } else if (strType == DBKeys::WALLETDESCRIPTORLHCACHE) {
@@ -1113,6 +1101,34 @@ static DBErrors LoadTxRecords(CWallet* pwallet, DatabaseBatch& batch, std::vecto
     return DBErrors::LOAD_OK;
 }
 
+static DBErrors LoadActiveSPKMs(CWallet* pwallet, DatabaseBatch& batch) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet)
+{
+    AssertLockHeld(pwallet->cs_wallet);
+
+    // Load spk records
+    std::set<std::pair<OutputType, bool>> seen_spks;
+    for (auto& spk_key : {DBKeys::ACTIVEEXTERNALSPK, DBKeys::ACTIVEINTERNALSPK}) {
+        LoadResult spkm_res = LoadRecords(pwallet, batch, spk_key,
+            [&seen_spks, &spk_key] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) {
+            uint8_t output_type;
+            key >> output_type;
+            uint256 id;
+            value >> id;
+
+            bool internal = spk_key == DBKeys::ACTIVEINTERNALSPK;
+            auto [it, insert] = seen_spks.emplace(static_cast<OutputType>(output_type), internal);
+            if (!insert) {
+                pwallet->WalletLogPrintf("Multiple ScriptpubKeyMans specified for a single type\n");
+                return DBErrors::CORRUPT;
+            }
+            pwallet->LoadActiveScriptPubKeyMan(id, static_cast<OutputType>(output_type), /*internal=*/internal);
+            return DBErrors::LOAD_OK;
+        });
+        if (spkm_res.m_result != DBErrors::LOAD_OK) return spkm_res.m_result;
+    }
+    return DBErrors::LOAD_OK;
+}
+
 DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
 {
     CWalletScanState wss;
@@ -1156,6 +1172,9 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
 
         // Load tx records
         result = std::max(LoadTxRecords(pwallet, *m_batch, upgraded_txs, any_unordered), result);
+
+        // Load SPKMs
+        result = std::max(LoadActiveSPKMs(pwallet, *m_batch), result);
 
         // Get cursor
         std::unique_ptr<DatabaseCursor> cursor = m_batch->GetNewCursor();
@@ -1211,14 +1230,6 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
         }
     } catch (...) {
         result = DBErrors::CORRUPT;
-    }
-
-    // Set the active ScriptPubKeyMans
-    for (auto spk_man_pair : wss.m_active_external_spks) {
-        pwallet->LoadActiveScriptPubKeyMan(spk_man_pair.second, spk_man_pair.first, /*internal=*/false);
-    }
-    for (auto spk_man_pair : wss.m_active_internal_spks) {
-        pwallet->LoadActiveScriptPubKeyMan(spk_man_pair.second, spk_man_pair.first, /*internal=*/true);
     }
 
     if (rescan_required && result == DBErrors::LOAD_OK) {

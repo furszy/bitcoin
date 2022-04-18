@@ -482,7 +482,6 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         } else if (strType == DBKeys::KEY) {
             wss.nKeys++;
         } else if (strType == DBKeys::MASTER_KEY) {
-            if (!LoadEncryptionKey(pwallet, ssKey, ssValue, strErr)) return false;
         } else if (strType == DBKeys::CRYPTED_KEY) {
             wss.fIsEncrypted = true;
             wss.nCKeys++;
@@ -1138,6 +1137,21 @@ static DBErrors LoadActiveSPKMs(CWallet* pwallet, DatabaseBatch& batch) EXCLUSIV
     return DBErrors::LOAD_OK;
 }
 
+static DBErrors LoadDecryptionKeys(CWallet* pwallet, DatabaseBatch& batch) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet)
+{
+    AssertLockHeld(pwallet->cs_wallet);
+
+    // Load decryption key (mkey) records
+    LoadResult mkey_res = LoadRecords(pwallet, batch, DBKeys::MASTER_KEY,
+        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) {
+        if (!LoadEncryptionKey(pwallet, key, value, err)) {
+            return DBErrors::CORRUPT;
+        }
+        return DBErrors::LOAD_OK;
+    });
+    return mkey_res.m_result;;
+}
+
 DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
 {
     CWalletScanState wss;
@@ -1184,6 +1198,9 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
 
         // Load SPKMs
         result = std::max(LoadActiveSPKMs(pwallet, *m_batch), result);
+
+        // Load decryption keys
+        result = std::max(LoadDecryptionKeys(pwallet, *m_batch), result);
 
         // Get cursor
         std::unique_ptr<DatabaseCursor> cursor = m_batch->GetNewCursor();

@@ -552,11 +552,14 @@ private:
     std::unique_ptr<FlatSigningProvider> GetSigningProvider(const CScript& script, bool include_private = false) const;
     // Fetch the SigningProvider for the given pubkey and always include private keys. This should only be called by signing code.
     std::unique_ptr<FlatSigningProvider> GetSigningProvider(const CPubKey& pubkey) const;
-    // Fetch the SigningProvider for a given index and optionally include private keys. Called by the above functions.
-    std::unique_ptr<FlatSigningProvider> GetSigningProvider(int32_t index, bool include_private = false) const EXCLUSIVE_LOCKS_REQUIRED(cs_desc_man);
 
 protected:
   WalletDescriptor m_wallet_descriptor GUARDED_BY(cs_desc_man);
+
+  // Fetch the SigningProvider for a given index and optionally include private keys. Called by the GetSigningProvider* functions and unit tests only.
+  std::unique_ptr<FlatSigningProvider> GetSigningProvider(int32_t index, bool include_private = false) const EXCLUSIVE_LOCKS_REQUIRED(cs_desc_man);
+  // Fetch the SigningProvider cache (only used for test purposes)
+  std::map<int32_t, FlatSigningProvider> GetSigningProvidersCache() { return m_map_signing_providers; }
 
 public:
     DescriptorScriptPubKeyMan(WalletStorage& storage, WalletDescriptor& descriptor)

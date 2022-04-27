@@ -95,7 +95,6 @@ CoinsResult AvailableCoins(const CWallet& wallet,
     AssertLockHeld(wallet.cs_wallet);
 
     CoinsResult result;
-    CAmount nTotal = 0;
     // Either the WALLET_FLAG_AVOID_REUSE flag is not set (in which case we always allow), or we default to avoiding, and only in the case where
     // a coin control object is provided, and has the avoid address reuse flag set to false, do we allow already used addresses
     bool allow_used_addresses = !wallet.IsWalletFlagSet(WALLET_FLAG_AVOID_REUSE) || (coinControl && !coinControl->m_avoid_address_reuse);
@@ -206,12 +205,11 @@ CoinsResult AvailableCoins(const CWallet& wallet,
 
             int input_bytes = GetTxSpendSize(wallet, wtx, i, (coinControl && coinControl->fAllowWatchOnly));
             result.coins.emplace_back(outpoint, output, nDepth, input_bytes, spendable, solvable, safeTx, wtx.GetTxTime(), tx_from_me, feerate);
+            result.total_amount += output.nValue;
 
             // Checks the sum amount of all UTXO's.
             if (nMinimumSumAmount != MAX_MONEY) {
-                nTotal += output.nValue;
-
-                if (nTotal >= nMinimumSumAmount) {
+                if (result.total_amount >= nMinimumSumAmount) {
                     return result;
                 }
             }
@@ -231,17 +229,13 @@ CoinsResult AvailableCoinsListUnspent(const CWallet& wallet, const CCoinControl*
     return AvailableCoins(wallet, coinControl, /*feerate=*/ std::nullopt, nMinimumAmount, nMaximumAmount, nMinimumSumAmount, nMaximumCount);
 }
 
-CAmount GetAvailableBalance(const CWallet& wallet, const CCoinControl* coinControl)
+CAmount GetAvailableBalance(const CWallet& wallet, const CCoinControl* _coinControl)
 {
     LOCK(wallet.cs_wallet);
-
-    CAmount balance = 0;
-    for (const COutput& out : AvailableCoinsListUnspent(wallet, coinControl).coins) {
-        if (out.spendable) {
-            balance += out.txout.nValue;
-        }
-    }
-    return balance;
+    // Copy to filter by spendable coins only
+    CCoinControl coinControl = _coinControl ? *_coinControl : CCoinControl();
+    coinControl.m_include_only_spendable_outputs = true;
+    return AvailableCoinsListUnspent(wallet, &coinControl).total_amount;
 }
 
 const CTxOut& FindNonChangeParentOutput(const CWallet& wallet, const CTransaction& tx, int output)

@@ -36,6 +36,8 @@ TxSize CalculateMaximumSignedTxSize(const CTransaction& tx, const CWallet* walle
 
 struct CoinsResult {
     std::vector<COutput> coins;
+    // Sum of all the coins amounts
+    CAmount total_amount{0};
 };
 /**
  * Populate vCoins with vector of available COutputs.

@@ -113,5 +113,26 @@ BOOST_FIXTURE_TEST_CASE(FillInputToWeightTest, BasicTestingSetup)
     // Note: We don't test the next boundary because of memory allocation constraints.
 }
 
+BOOST_FIXTURE_TEST_CASE(create_tx_total_with_fee_exceeds_available_balance, TestChain100Setup)
+{
+    auto wallet = CreateSyncedWallet(*m_node.chain, m_node.chainman->ActiveChain(), m_args, coinbaseKey);
+
+    auto script_out = GetScriptForRawPubKey(coinbaseKey.GetPubKey());
+    const auto& block = CreateAndProcessBlock({}, script_out);
+    wallet->blockConnected(block, m_node.chainman->ActiveChain().Tip()->nHeight);
+    BOOST_CHECK_EQUAL(GetAvailableBalance(*wallet), COIN * 50);
+
+    // The wallet has only one input of 50 BTC available, let's create a tx that, with fee included, exceeds the available balance.
+    std::vector<CRecipient> recipients;
+    recipients.push_back({script_out, COIN * 50, false});
+    CCoinControl coin_control;
+    coin_control.m_feerate = CFeeRate(1000);
+    bilingual_str error;
+    FeeCalculation dummy_calc;
+    auto res = CreateTransaction(*wallet, recipients, -1, error, coin_control, dummy_calc);
+    BOOST_CHECK(!res);
+    BOOST_CHECK_EQUAL(error.original, "The total exceeds your balance when the transaction fee is included");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 } // namespace wallet

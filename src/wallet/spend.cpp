@@ -794,6 +794,11 @@ static CallResult<CreatedTransactionResult> CreateTransactionInternal(
     // Choose coins to use
     std::optional<SelectionResult> result = SelectCoins(wallet, res_available_coins.coins, /*nTargetValue=*/selection_target, coin_control, coin_selection_params);
     if (!result) {
+        if (!coin_selection_params.m_subtract_fee_outputs &&
+            recipients_sum <= res_available_coins.total_amount &&
+            recipients_sum + not_input_fees > res_available_coins.total_amount) {
+            return _("The total exceeds your balance when the transaction fee is included");
+        }
         return _("Insufficient funds");
     }
     TRACE5(coin_selection, selected_coins, wallet.GetName().c_str(), GetAlgorithmName(result->m_algo).c_str(), result->m_target, result->GetWaste(), result->GetSelectedValue());

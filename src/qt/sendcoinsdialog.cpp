@@ -252,6 +252,7 @@ SendCoinsDialog::~SendCoinsDialog()
 bool SendCoinsDialog::PrepareSendText(QString& question_string, QString& informative_text, QString& detailed_text)
 {
     QList<SendCoinsRecipient> recipients;
+    std::set<QString> unique_addresses;
     for (int i = 0; i < ui->entries->count(); ++i) {
         SendCoinsEntry* entry = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(i)->widget());
         if (entry) {
@@ -263,7 +264,17 @@ bool SendCoinsDialog::PrepareSendText(QString& question_string, QString& informa
                 return false; // invalid entry
             }
 
-            recipients.append(entry->getValue());
+            // Obtain the recipient
+            const auto& recipient = entry->getValue();
+
+            // Forbid duplicate addresses
+            if (!unique_addresses.insert(recipient.address).second) {
+                ui->scrollArea->ensureWidgetVisible(entry);
+                processSendCoinsReturn(WalletModel::DuplicateAddress); // notify user
+                return false; // invalid entry
+            }
+
+            recipients.append(recipient);
         }
     }
 
@@ -765,6 +776,7 @@ void SendCoinsDialog::processSendCoinsReturn(const WalletModel::SendCoinsReturn 
     }
 
     Q_EMIT message(tr("Send Coins"), msgParams.first, msgParams.second);
+    return false;
 }
 
 void SendCoinsDialog::minimizeFeeSection(bool fMinimize)

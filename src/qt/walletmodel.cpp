@@ -164,7 +164,6 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
     }
 
     // Pre-check input data for validity
-    std::set<QString> unique_addresses;
     for (const SendCoinsRecipient &rcp : recipients)
     {
         if (rcp.fSubtractFeeFromAmount)
@@ -177,9 +176,6 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
             if(rcp.amount <= 0)
             {
                 return InvalidAmount;
-            }
-            if (!unique_addresses.insert(rcp.address).second) {
-                return DuplicateAddress;
             }
 
             CScript scriptPubKey = GetScriptForDestination(DecodeDestination(rcp.address.toStdString()));

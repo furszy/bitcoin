@@ -61,6 +61,7 @@ public:
     {
         OK,
         InvalidAmount,
+        InvalidAmountDust,
         InvalidAddress,
         AmountExceedsBalance,
         AmountWithFeeExceedsBalance,

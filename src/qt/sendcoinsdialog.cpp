@@ -735,6 +735,9 @@ void SendCoinsDialog::processSendCoinsReturn(const WalletModel::SendCoinsReturn 
     case WalletModel::InvalidAmount:
         msgParams.first = tr("The amount to pay must be larger than 0.");
         break;
+    case WalletModel::InvalidAmountDust:
+        msgParams.first = tr("The amount to pay must be larger than the minimum dust threshold.");
+        break;
     case WalletModel::AmountExceedsBalance:
         msgParams.first = tr("The amount exceeds your balance.");
         break;

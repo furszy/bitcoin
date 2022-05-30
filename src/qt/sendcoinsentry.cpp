@@ -150,7 +150,7 @@ WalletModel::SendCoinsReturn SendCoinsEntry::validate(interfaces::Node& node)
     // Reject dust outputs
     if (GUIUtil::isDust(node, ui->payTo->text(), ui->payAmount->value())) {
         ui->payAmount->setValid(false);
-        return WalletModel::InvalidAmount;
+        return WalletModel::InvalidAmountDust;
     }
 
     // all good

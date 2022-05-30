@@ -6,10 +6,10 @@
 #define BITCOIN_QT_SENDCOINSENTRY_H
 
 #include <qt/sendcoinsrecipient.h>
+#include <qt/walletmodel.h> // for Walletmodel::StatusCode
 
 #include <QStackedWidget>
 
-class WalletModel;
 class PlatformStyle;
 
 namespace interfaces {
@@ -34,7 +34,14 @@ public:
     ~SendCoinsEntry();
 
     void setModel(WalletModel *model);
-    bool validate(interfaces::Node& node);
+
+    /**
+    * Validates that:
+    * 1) The address is valid (network supported).
+    * 2) The amount is valid and greater than 0.
+    * 3) The amount is not dust.
+    */
+    WalletModel::SendCoinsReturn validate(interfaces::Node& node);
     SendCoinsRecipient getValue();
 
     /** Return whether the entry is still empty and unedited */

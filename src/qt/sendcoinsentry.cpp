@@ -131,39 +131,30 @@ void SendCoinsEntry::useAvailableBalanceClicked()
     Q_EMIT useAvailableBalance(this);
 }
 
-bool SendCoinsEntry::validate(interfaces::Node& node)
+WalletModel::SendCoinsReturn SendCoinsEntry::validate(interfaces::Node& node)
 {
-    if (!model)
-        return false;
+    assert(model);
 
-    // Check input validity
-    bool retval = true;
-
-    if (!model->validateAddress(ui->payTo->text()))
-    {
+    // Validate address
+    if (!model->validateAddress(ui->payTo->text())) {
         ui->payTo->setValid(false);
-        retval = false;
+        return WalletModel::InvalidAddress;
     }
 
-    if (!ui->payAmount->validate())
-    {
-        retval = false;
+    // Validate amount, must be valid and positive
+    if (!ui->payAmount->validate() ||
+        ui->payAmount->value(nullptr) <= 0) {
+        return WalletModel::InvalidAmount;
     }
 
-    // Sending a zero amount is invalid
-    if (ui->payAmount->value(nullptr) <= 0)
-    {
+    // Reject dust outputs
+    if (GUIUtil::isDust(node, ui->payTo->text(), ui->payAmount->value())) {
         ui->payAmount->setValid(false);
-        retval = false;
+        return WalletModel::InvalidAmount;
     }
 
-    // Reject dust outputs:
-    if (retval && GUIUtil::isDust(node, ui->payTo->text(), ui->payAmount->value())) {
-        ui->payAmount->setValid(false);
-        retval = false;
-    }
-
-    return retval;
+    // all good
+    return WalletModel::OK;
 }
 
 SendCoinsRecipient SendCoinsEntry::getValue()

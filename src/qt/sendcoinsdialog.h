@@ -91,6 +91,9 @@ private:
     void updateFeeMinimizedLabel();
     void updateCoinControlState();
 
+    // Fetches and validate all the entries
+    std::optional<QList<SendCoinsRecipient>> FetchAndValidateEntries();
+
 private Q_SLOTS:
     void sendButtonClicked(bool checked);
     void on_buttonChooseFee_clicked();

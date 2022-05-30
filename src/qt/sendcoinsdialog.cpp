@@ -249,7 +249,7 @@ SendCoinsDialog::~SendCoinsDialog()
     delete ui;
 }
 
-bool SendCoinsDialog::PrepareSendText(QString& question_string, QString& informative_text, QString& detailed_text)
+std::optional<QList<SendCoinsRecipient>> SendCoinsDialog::FetchAndValidateEntries()
 {
     QList<SendCoinsRecipient> recipients;
     std::set<QString> unique_addresses;
@@ -261,7 +261,7 @@ bool SendCoinsDialog::PrepareSendText(QString& question_string, QString& informa
             if (res_validate.status != WalletModel::OK) {
                 ui->scrollArea->ensureWidgetVisible(entry);
                 processSendCoinsReturn(res_validate); // notify user
-                return false; // invalid entry
+                return std::nullopt; // invalid entry
             }
 
             // Obtain the recipient
@@ -271,15 +271,20 @@ bool SendCoinsDialog::PrepareSendText(QString& question_string, QString& informa
             if (!unique_addresses.insert(recipient.address).second) {
                 ui->scrollArea->ensureWidgetVisible(entry);
                 processSendCoinsReturn(WalletModel::DuplicateAddress); // notify user
-                return false; // invalid entry
+                return std::nullopt; // invalid entry
             }
 
             recipients.append(recipient);
         }
     }
+    return recipients;
+}
 
-    if (recipients.isEmpty()) {
-        return false;
+bool SendCoinsDialog::PrepareSendText(QString& question_string, QString& informative_text, QString& detailed_text)
+{
+    const auto& recipients = FetchAndValidateEntries();
+    if (!recipients || recipients->isEmpty()) {
+        return false; // Entry invalidity reason is signaled internally (FetchAndValidateEntries).
     }
 
     fNewRecipientAllowed = false;
@@ -291,7 +296,7 @@ bool SendCoinsDialog::PrepareSendText(QString& question_string, QString& informa
     }
 
     // prepare transaction for getting txFee earlier
-    m_current_transaction = std::make_unique<WalletModelTransaction>(recipients);
+    m_current_transaction = std::make_unique<WalletModelTransaction>(*recipients);
     WalletModel::SendCoinsReturn prepareStatus;
 
     updateCoinControlState();
@@ -776,7 +781,6 @@ void SendCoinsDialog::processSendCoinsReturn(const WalletModel::SendCoinsReturn 
     }
 
     Q_EMIT message(tr("Send Coins"), msgParams.first, msgParams.second);
-    return false;
 }
 
 void SendCoinsDialog::minimizeFeeSection(bool fMinimize)

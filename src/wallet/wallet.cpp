@@ -2636,19 +2636,15 @@ void CWallet::LoadDestData(const CTxDestination &dest, const std::string &key, c
     m_address_book[dest].destdata.insert(std::make_pair(key, value));
 }
 
+bool CWallet::IsUsedInAddrBook(const CAddressBookData& data) const
+{
+    return data.destdata.find("used") != data.destdata.end();
+}
+
 bool CWallet::IsAddressUsed(const CTxDestination& dest) const
 {
-    const std::string key{"used"};
     std::map<CTxDestination, CAddressBookData>::const_iterator i = m_address_book.find(dest);
-    if(i != m_address_book.end())
-    {
-        CAddressBookData::StringMap::const_iterator j = i->second.destdata.find(key);
-        if(j != i->second.destdata.end())
-        {
-            return true;
-        }
-    }
-    return false;
+    return i != m_address_book.end() && IsUsedInAddrBook(i->second);
 }
 
 std::vector<std::string> CWallet::GetAddressReceiveRequests() const

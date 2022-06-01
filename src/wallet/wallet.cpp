@@ -889,23 +889,26 @@ bool CWallet::MarkReplaced(const uint256& originalHash, const uint256& newHash)
     return success;
 }
 
-void CWallet::SetSpentKeyState(WalletBatch& batch, const uint256& hash, unsigned int n, bool used, std::set<CTxDestination>& tx_destinations)
+void CWallet::MarkDestUsedInAddressBook(WalletBatch* batch, const uint256& hash, unsigned int n, std::set<CTxDestination>* tx_destinations)
 {
     AssertLockHeld(cs_wallet);
     const CWalletTx* srctx = GetWalletTx(hash);
     if (!srctx) return;
 
+    MarkDestUsedInAddressBook(batch, srctx->tx->vout[n].scriptPubKey, tx_destinations);
+}
+
+void CWallet::MarkDestUsedInAddressBook(WalletBatch* batch, const CScript& script, std::set<CTxDestination>* tx_destinations)
+{
     CTxDestination dst;
-    if (ExtractDestination(srctx->tx->vout[n].scriptPubKey, dst)) {
-        if (IsMine(dst)) {
-            if (used != IsAddressUsed(dst)) {
-                if (used) {
-                    tx_destinations.insert(dst);
-                }
-                SetAddressUsed(batch, dst, used);
-            }
-        }
+    if (!ExtractDestination(script, dst)) return;
+
+    if (!IsAddressUsed(dst)) {
+        // Update internal state
+        SetAddressUsed(dst, batch);
     }
+
+    if (tx_destinations && IsMine(script)) tx_destinations->insert(dst);
 }
 
 bool CWallet::IsSpentKey(const uint256& hash, unsigned int n) const
@@ -952,15 +955,19 @@ CWalletTx* CWallet::AddToWallet(CTransactionRef tx, const TxState& state, const 
     uint256 hash = tx->GetHash();
 
     if (IsWalletFlagSet(WALLET_FLAG_AVOID_REUSE)) {
-        // Mark used destinations
+        // Mark inputs destinations as used
         std::set<CTxDestination> tx_destinations;
-
         for (const CTxIn& txin : tx->vin) {
             const COutPoint& op = txin.prevout;
-            SetSpentKeyState(batch, op.hash, op.n, true, tx_destinations);
+            MarkDestUsedInAddressBook(&batch, op.hash, op.n, &tx_destinations);
         }
 
         MarkDestinationsDirty(tx_destinations);
+
+        // Mark outputs destinations as used
+        for (unsigned int i = 0; i < tx->vout.size(); i++) {
+            MarkDestUsedInAddressBook(&batch, tx->vout[i].scriptPubKey);
+        }
     }
 
     // Inserts only if not already there, returns tx inserted or tx found
@@ -1073,6 +1080,7 @@ bool CWallet::LoadToWallet(const uint256& hash, const UpdateWalletTxFn& fill_wtx
         wtx.m_it_wtxOrdered = wtxOrdered.insert(std::make_pair(wtx.nOrderPos, &wtx));
     }
     AddToSpends(hash);
+    bool avoid_reuse = IsWalletFlagSet(WALLET_FLAG_AVOID_REUSE);
     for (const CTxIn& txin : wtx.tx->vin) {
         auto it = mapWallet.find(txin.prevout.hash);
         if (it != mapWallet.end()) {
@@ -1080,8 +1088,17 @@ bool CWallet::LoadToWallet(const uint256& hash, const UpdateWalletTxFn& fill_wtx
             if (auto* prev = prevtx.state<TxStateConflicted>()) {
                 MarkConflicted(prev->conflicting_block_hash, prev->conflicting_block_height, wtx.GetHash());
             }
+            if (avoid_reuse) MarkDestUsedInAddressBook(nullptr/*batch*/, prevtx.tx->vout[txin.prevout.n].scriptPubKey);
         }
     }
+
+    // Mark outputs as used as well
+    if (avoid_reuse) {
+        for (unsigned int i = 0; i < wtx.tx->vout.size(); i++) {
+            MarkDestUsedInAddressBook(nullptr/*batch*/, wtx.tx->vout[i].scriptPubKey);
+        }
+    }
+
     return true;
 }
 
@@ -2603,20 +2620,15 @@ unsigned int CWallet::ComputeTimeSmart(const CWalletTx& wtx, bool rescanning_old
     return nTimeSmart;
 }
 
-bool CWallet::SetAddressUsed(WalletBatch& batch, const CTxDestination& dest, bool used)
+bool CWallet::SetAddressUsed(const CTxDestination& dest, WalletBatch* batch)
 {
     const std::string key{"used"};
     if (std::get_if<CNoDestination>(&dest))
         return false;
 
-    if (!used) {
-        if (auto* data = util::FindKey(m_address_book, dest)) data->destdata.erase(key);
-        return batch.EraseDestData(EncodeDestination(dest), key);
-    }
-
     const std::string value{"1"};
     m_address_book[dest].destdata.insert(std::make_pair(key, value));
-    return batch.WriteDestData(EncodeDestination(dest), key, value);
+    return batch == nullptr || batch->WriteDestData(EncodeDestination(dest), key, value);
 }
 
 void CWallet::LoadDestData(const CTxDestination &dest, const std::string &key, const std::string &value)

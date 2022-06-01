@@ -296,6 +296,7 @@ private:
     std::atomic<uint64_t> m_wallet_flags{0};
 
     bool SetAddressBookWithDB(WalletBatch& batch, const CTxDestination& address, const std::string& strName, const std::string& strPurpose);
+    bool IsUsedInAddrBook(const CAddressBookData& data) const;
 
     //! Unsets a wallet flag and saves it to disk
     void UnsetWalletFlagWithDB(WalletBatch& batch, uint64_t flag);

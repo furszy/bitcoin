@@ -904,7 +904,7 @@ static DBErrors LoadAddressBookRecords(CWallet* pwallet, DatabaseBatch& batch) E
 
     // Load name record
     LoadResult name_res = LoadRecords(pwallet, batch, DBKeys::NAME,
-        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) {
+        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err)  EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet) {
         std::string strAddress;
         key >> strAddress;
         std::string label;
@@ -916,7 +916,7 @@ static DBErrors LoadAddressBookRecords(CWallet* pwallet, DatabaseBatch& batch) E
 
     // Load purpose record
     LoadResult purpose_res = LoadRecords(pwallet, batch, DBKeys::PURPOSE,
-        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) {
+        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err)  EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet) {
         std::string strAddress;
         key >> strAddress;
         value >> pwallet->m_address_book[DecodeDestination(strAddress)].purpose;
@@ -926,7 +926,7 @@ static DBErrors LoadAddressBookRecords(CWallet* pwallet, DatabaseBatch& batch) E
 
     // Load destination data record
     LoadResult dest_res = LoadRecords(pwallet, batch, DBKeys::DESTDATA,
-        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) {
+        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet) {
         std::string strAddress, strKey, strValue;
         key >> strAddress;
         key >> strKey;
@@ -948,7 +948,7 @@ static DBErrors LoadTxRecords(CWallet* pwallet, DatabaseBatch& batch, std::vecto
     bool corrupted_tx = false;
     any_unordered = false;
     LoadResult tx_res = LoadRecords(pwallet, batch, DBKeys::TX,
-        [&corrupted_tx, &any_unordered, &upgraded_txs] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) {
+        [&corrupted_tx, &any_unordered, &upgraded_txs] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet) {
         DBErrors result = DBErrors::LOAD_OK;
         uint256 hash;
         key >> hash;
@@ -1006,7 +1006,7 @@ static DBErrors LoadTxRecords(CWallet* pwallet, DatabaseBatch& batch, std::vecto
 
     // Load locked utxo record
     LoadResult locked_utxo_res = LoadRecords(pwallet, batch, DBKeys::LOCKED_UTXO,
-        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) {
+        [] (CWallet* pwallet, CDataStream& key, CDataStream& value, std::string& err) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet) {
         uint256 hash;
         uint32_t n;
         key >> hash;

@@ -6,7 +6,14 @@
 
 #include <fs.h>
 #include <test/util/setup_common.h>
+#include <util/translation.h>
+#ifdef USE_BDB
 #include <wallet/bdb.h>
+#endif
+#ifdef USE_SQLITE
+#include <wallet/sqlite.h>
+#endif
+#include <wallet/walletutil.h> // for WALLET_FLAG_DESCRIPTORS
 
 #include <fstream>
 #include <memory>
@@ -76,6 +83,63 @@ BOOST_AUTO_TEST_CASE(getwalletenv_g_dbenvs_free_instance)
 
     BOOST_CHECK(env_1_a != env_1_b);
     BOOST_CHECK(env_2_a == env_2_b);
+}
+
+BOOST_AUTO_TEST_CASE(db_cursor_prefix_range_test)
+{
+    std::vector<std::unique_ptr<WalletDatabase>> dbs;
+
+    // Create dbs
+    DatabaseOptions options;
+    options.create_flags = WALLET_FLAG_DESCRIPTORS;
+    DatabaseStatus status;
+    bilingual_str error;
+    std::vector<bilingual_str> warnings;
+#ifdef USE_BDB
+    dbs.emplace_back(MakeBerkeleyDatabase(m_path_root / "bdb", options, status, error));
+#endif
+#ifdef USE_SQLITE
+    dbs.emplace_back(MakeSQLiteDatabase(m_path_root / "sqlite", options, status, error));
+#endif
+
+    // Test each supported db
+    for (const auto& database : dbs) {
+        BOOST_ASSERT(database);
+
+        std::string FIRST_KEY = "FIRST"; // stores std::vector<int>
+        std::string SECOND_KEY = "SECOND"; // stores int
+
+        // Write elements to it
+        std::unique_ptr<DatabaseBatch> handler = database->MakeBatch();
+        for (unsigned int i = 0; i < 10; i++) {
+            BOOST_CHECK(handler->Write(std::make_pair(FIRST_KEY, i), std::vector<unsigned int>({i})));
+            BOOST_CHECK(handler->Write(std::make_pair(SECOND_KEY, i), i));
+        }
+
+        // Now read all the first key items and verify that each element gets parsed correctly
+        CDataStream prefix(0, 0);
+        prefix << FIRST_KEY;
+        std::unique_ptr<DatabaseCursor> cursor = handler->GetNewPrefixCursor(prefix);
+        CDataStream key(0, 0);
+        CDataStream value(0, 0);
+        bool complete;
+        for (int i = 0; i < 10; i++) {
+            BOOST_CHECK(cursor->Next(key, value, complete));
+            BOOST_ASSERT(!complete);
+
+            std::string key_back;
+            key >> key_back;
+            BOOST_CHECK_EQUAL(key_back, FIRST_KEY);
+
+            std::vector<unsigned int> value_back;
+            value >> value_back;
+            BOOST_CHECK_EQUAL(value_back.at(0), i);
+        }
+
+        // Let's now read it once more, it should return complete=true and fail
+        BOOST_CHECK(!cursor->Next(key, value, complete));
+        BOOST_ASSERT(complete);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

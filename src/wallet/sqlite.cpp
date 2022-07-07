@@ -477,7 +477,7 @@ bool SQLiteCursor::Next(CDataStream& key, CDataStream& value, bool& complete)
     int res = sqlite3_step(m_cursor_stmt);
     if (res == SQLITE_DONE) {
         complete = true;
-        return true;
+        return false;
     }
     if (res != SQLITE_ROW) {
         LogPrintf("SQLiteCursor::Next: Unable to execute cursor step: %s\n", sqlite3_errstr(res));

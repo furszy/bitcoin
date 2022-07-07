@@ -685,10 +685,16 @@ bool BerkeleyCursor::Next(CDataStream& ssKey, CDataStream& ssValue, bool& comple
     else if (datKey.get_data() == nullptr || datValue.get_data() == nullptr)
         return false;
 
+    Span<const std::byte> raw_key = {AsBytePtr(datKey.get_data()), datKey.get_size()};
+    if (!m_key_prefix.empty() && std::mismatch(raw_key.begin(), raw_key.end(), m_key_prefix.begin(), m_key_prefix.end()).second != m_key_prefix.end()) {
+        complete = true;
+        return false;
+    }
+
     // Convert to streams
     ssKey.SetType(SER_DISK);
     ssKey.clear();
-    ssKey.write({AsBytePtr(datKey.get_data()), datKey.get_size()});
+    ssKey.write(raw_key);
     ssValue.SetType(SER_DISK);
     ssValue.clear();
     ssValue.write({AsBytePtr(datValue.get_data()), datValue.get_size()});

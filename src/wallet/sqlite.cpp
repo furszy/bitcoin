@@ -484,6 +484,9 @@ bool SQLiteCursor::Next(CDataStream& key, CDataStream& value, bool& complete)
         return false;
     }
 
+    key.clear();
+    value.clear();
+
     // Leftmost column in result is index 0
     const std::byte* key_data{AsBytePtr(sqlite3_column_blob(m_cursor_stmt, 0))};
     size_t key_data_size(sqlite3_column_bytes(m_cursor_stmt, 0));

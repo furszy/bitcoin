@@ -1035,6 +1035,16 @@ DBErrors WalletBatch::ZapSelectTx(std::vector<uint256>& vTxHashIn, std::vector<u
     return DBErrors::LOAD_OK;
 }
 
+std::string DbSanityChecks()
+{
+#ifdef USE_BDB
+    if (!BerkeleyDatabaseSanityCheck()) {
+         return "A version conflict was detected between the run-time BerkeleyDB library and the one used during compilation.";
+     }
+#endif
+    return ""; // all good
+}
+
 void MaybeCompactWalletDB(WalletContext& context)
 {
     static std::atomic<bool> fOneThread(false);

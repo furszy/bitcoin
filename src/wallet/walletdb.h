@@ -288,6 +288,10 @@ private:
     WalletDatabase& m_database;
 };
 
+/** Pre-initialization sanity checks
+ * Returns an empty string if no error occurred. */
+std::string DbSanityChecks();
+
 //! Compacts BDB state so that wallet.dat is self-contained (if there are changes)
 void MaybeCompactWalletDB(WalletContext& context);
 

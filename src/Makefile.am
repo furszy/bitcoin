@@ -313,10 +313,8 @@ BITCOIN_CORE_H = \
   wallet/receive.h \
   wallet/rpc/util.h \
   wallet/rpc/wallet.h \
-  wallet/salvage.h \
   wallet/scriptpubkeyman.h \
   wallet/spend.h \
-  wallet/sqlite.h \
   wallet/transaction.h \
   wallet/wallet.h \
   wallet/walletdb.h \
@@ -330,6 +328,12 @@ BITCOIN_CORE_H = \
   zmq/zmqrpc.h \
   zmq/zmqutil.h
 
+if USE_SQLITE
+BITCOIN_CORE_H += wallet/sqlite.h
+endif
+if USE_BDB
+BITCOIN_CORE_H += wallet/bdb.h wallet/salvage.h
+endif
 
 obj/build.h: FORCE
 	@$(MKDIR_P) $(builddir)/obj

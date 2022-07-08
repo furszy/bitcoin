@@ -12,7 +12,9 @@
 #include <util/system.h>
 #include <util/translation.h>
 #include <wallet/dump.h>
+#ifdef USE_BDB
 #include <wallet/salvage.h>
+#endif
 #include <wallet/wallet.h>
 #include <wallet/walletutil.h>
 

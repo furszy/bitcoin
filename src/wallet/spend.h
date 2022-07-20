@@ -42,6 +42,7 @@ struct AvailableCoinsParams {
     CAmount nMinimumSumAmount{MAX_MONEY};
     uint64_t nMaximumCount{0};
     bool only_spendable{true};
+    bool skip_locked{true};
 };
 
 /**

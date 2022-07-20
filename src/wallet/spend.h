@@ -34,18 +34,23 @@ struct CoinsResult {
     // Sum of all the coins amounts
     CAmount total_amount{0};
 };
+
+struct AvailableCoinsParams {
+    std::optional<CFeeRate> feerate{std::nullopt};
+    CAmount nMinimumAmount{1};
+    CAmount nMaximumAmount{MAX_MONEY};
+    CAmount nMinimumSumAmount{MAX_MONEY};
+    uint64_t nMaximumCount{0};
+    bool only_spendable{true};
+};
+
 /**
  * Return vector of available COutputs.
  * By default, returns only the spendable coins.
  */
 CoinsResult AvailableCoins(const CWallet& wallet,
                            const CCoinControl* coinControl = nullptr,
-                           std::optional<CFeeRate> feerate = std::nullopt,
-                           const CAmount& nMinimumAmount = 1,
-                           const CAmount& nMaximumAmount = MAX_MONEY,
-                           const CAmount& nMinimumSumAmount = MAX_MONEY,
-                           const uint64_t nMaximumCount = 0,
-                           bool only_spendable = true) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet);
+                           const AvailableCoinsParams& params = {}) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet);
 
 /**
  * Wrapper function for AvailableCoins which skips the `feerate` parameter. Use this function

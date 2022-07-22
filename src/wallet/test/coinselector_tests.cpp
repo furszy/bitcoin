@@ -321,6 +321,9 @@ BOOST_AUTO_TEST_CASE(bnb_search_test)
         const auto result9 = SelectCoinsBnB(GroupCoins(coins), 1 * CENT, coin_selection_params_bnb.m_cost_of_change);
         BOOST_CHECK(result9);
         BOOST_CHECK_EQUAL(result9->GetSelectedValue(), 1 * CENT);
+
+        // Back m_subtract_fee_outputs to initial state so it's not propagated to other test cases
+        coin_selection_params_bnb.m_subtract_fee_outputs = false;
     }
 
     {

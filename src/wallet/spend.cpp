@@ -440,9 +440,9 @@ std::optional<SelectionResult> SelectCoins(const CWallet& wallet, const std::vec
     for (const COutPoint& outpoint : vPresetInputs) {
         int input_bytes = -1;
         CTxOut txout;
-        auto ptr_wtx = wallet.GetWalletTx(outpoint.hash);
-        if (ptr_wtx) {
+        if (wallet.IsMine(outpoint)) {
             // Clearly invalid input, fail
+            auto ptr_wtx = wallet.GetWalletTx(outpoint.hash);
             if (ptr_wtx->tx->vout.size() <= outpoint.n) {
                 return std::nullopt;
             }

@@ -5,11 +5,14 @@
 """Test Migrating a wallet from legacy to descriptor."""
 
 import os
-
+import random
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
     assert_raises_rpc_error,
+)
+from test_framework.wallet_util import (
+    get_generate_key,
 )
 
 
@@ -32,43 +35,73 @@ class WalletMigrationTest(BitcoinTestFramework):
             assert_equal(file_magic, b'SQLite format 3\x00')
         assert_equal(self.nodes[0].get_wallet_rpc(wallet_name).getwalletinfo()["format"], "sqlite")
 
+    def create_wallet(self, wallet_name):
+        self.nodes[0].createwallet(wallet_name=wallet_name)
+        wallet = self.nodes[0].get_wallet_rpc(wallet_name)
+        assert_equal(wallet.getwalletinfo()["descriptors"], False)
+        assert_equal(wallet.getwalletinfo()["format"], "bdb")
+        return wallet
+
+    def assert_addr_info_equal(self, addr_info, addr_info_old):
+        assert_equal(addr_info["address"], addr_info_old["address"])
+        assert_equal(addr_info["scriptPubKey"], addr_info_old["scriptPubKey"])
+        assert_equal(addr_info["ismine"], addr_info_old["ismine"])
+        assert_equal(addr_info["hdkeypath"], addr_info_old["hdkeypath"])
+        assert_equal(addr_info["solvable"], addr_info_old["solvable"])
+        assert_equal(addr_info["ischange"], addr_info_old["ischange"])
+        assert_equal(addr_info["hdmasterfingerprint"], addr_info_old["hdmasterfingerprint"])
+
     def test_basic(self):
         default = self.nodes[0].get_wallet_rpc(self.default_wallet_name)
 
         self.log.info("Test migration of a basic keys only wallet without balance")
-        self.nodes[0].createwallet(wallet_name="basic0")
-        basic0 = self.nodes[0].get_wallet_rpc("basic0")
-        assert_equal(basic0.getwalletinfo()["descriptors"], False)
+        basic0 = self.create_wallet("basic0")
 
         addr = basic0.getnewaddress()
         change = basic0.getrawchangeaddress()
 
-        assert_equal(basic0.getaddressinfo(addr)["ismine"], True)
-        assert_equal(basic0.getaddressinfo(change)["ismine"], True)
+        old_addr_info = basic0.getaddressinfo(addr)
+        old_change_addr_info = basic0.getaddressinfo(change)
+        assert_equal(old_addr_info["ismine"], True)
+        assert_equal(old_addr_info["hdkeypath"], "m/0'/0'/0'")
+        assert_equal(old_change_addr_info["ismine"], True)
+        assert_equal(old_change_addr_info["hdkeypath"], "m/0'/1'/0'")
 
+        # Note: migration could take a while.
         basic0.migratewallet()
+
+        # Verify created descriptors
         assert_equal(basic0.getwalletinfo()["descriptors"], True)
         self.assert_is_sqlite("basic0")
 
+        # The wallet should create the following descriptors:
+        # * BIP32 descriptors in the form of "0'/0'/*" and "0'/1'/*" (2 descriptors)
+        # * BIP44 descriptors in the form of "44'/1'/0'/0/*" and "44'/1'/0'/1/*" (2 descriptors)
+        # * BIP49 descriptors, P2SH(P2WPKH), in the form of "86'/1'/0'/0/*" and "86'/1'/0'/1/*" (2 descriptors)
+        # * BIP84 descriptors, P2WPKH, in the form of "84'/1'/0'/1/*" and "84'/1'/0'/1/*" (2 descriptors)
+        # * BIP86 descriptors, P2TR, in the form of "86'/1'/0'/0/*" and "86'/1'/0'/1/*" (2 descriptors)
+        # * A combo(PK) descriptor for the wallet master key.
+        # So, should have a total of 11 descriptors on it.
+        assert_equal(len(basic0.listdescriptors()["descriptors"]), 11)
+
+        # Compare addresses info
         addr_info = basic0.getaddressinfo(addr)
-        assert_equal(addr_info["ismine"], True)
-        assert_equal(basic0.getaddressinfo(change)["ismine"], True)
-        assert_equal(addr_info["hdkeypath"], "m/0'/0'/0'")
+        change_addr_info = basic0.getaddressinfo(change)
+        self.assert_addr_info_equal(addr_info, old_addr_info)
+        self.assert_addr_info_equal(change_addr_info, old_change_addr_info)
 
         addr_info = basic0.getaddressinfo(basic0.getnewaddress("", "bech32"))
         assert_equal(addr_info["hdkeypath"], "m/84'/1'/0'/0/0")
 
         self.log.info("Test migration of a basic keys only wallet with a balance")
-        self.nodes[0].createwallet(wallet_name="basic1")
-        basic1 = self.nodes[0].get_wallet_rpc("basic1")
-        assert_equal(basic1.getwalletinfo()["descriptors"], False)
+        basic1 = self.create_wallet("basic1")
 
-        for i in range(0, 10):
+        for _ in range(0, 10):
             default.sendtoaddress(basic1.getnewaddress(), 1)
 
         self.generate(self.nodes[0], 1)
 
-        for i in range(0, 5):
+        for _ in range(0, 5):
             basic1.sendtoaddress(default.getnewaddress(), 0.5)
 
         self.generate(self.nodes[0], 1)
@@ -80,6 +113,38 @@ class WalletMigrationTest(BitcoinTestFramework):
         self.assert_is_sqlite("basic1")
         assert_equal(basic1.getbalance(), bal)
         assert_equal(basic1.listtransactions(), txs)
+
+        # restart node and verify that everything is still there
+        self.restart_node(0)
+        default = self.nodes[0].get_wallet_rpc(self.default_wallet_name)
+        self.nodes[0].loadwallet("basic1")
+        basic1 = self.nodes[0].get_wallet_rpc("basic1")
+        assert_equal(basic1.getwalletinfo()["descriptors"], True)
+        self.assert_is_sqlite("basic1")
+        assert_equal(basic1.getbalance(), bal)
+        assert_equal(basic1.listtransactions(), txs)
+
+        self.log.info("Test migration of a wallet with balance received on the seed")
+        basic2 = self.create_wallet("basic2")
+        basic2_seed = get_generate_key()
+        basic2.sethdseed(True, basic2_seed.privkey)
+        assert_equal(basic2.getbalance(), 0)
+
+        # Receive coins on different output types for the same seed
+        basic2_balance = 0
+        for addr in [basic2_seed.p2pkh_addr, basic2_seed.p2wpkh_addr, basic2_seed.p2sh_p2wpkh_addr]:
+            send_value = random.randint(1, 4)
+            default.sendtoaddress(addr, send_value)
+            basic2_balance += send_value
+            self.generate(self.nodes[0], 1)
+            assert_equal(basic2.getbalance(), basic2_balance)
+
+        # Now migrate and test that we still see have the same balance/transactions
+        basic2.migratewallet()
+        assert_equal(basic2.getwalletinfo()["descriptors"], True)
+        self.assert_is_sqlite("basic2")
+        assert_equal(basic2.getbalance(), basic2_balance)
+        assert_equal(basic2.listtransactions(), basic2_txs)
 
     def test_multisig(self):
         default = self.nodes[0].get_wallet_rpc(self.default_wallet_name)

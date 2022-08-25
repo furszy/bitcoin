@@ -783,8 +783,6 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     coin_selection_params.m_long_term_feerate = wallet.m_consolidate_feerate;
 
     CAmount recipients_sum = 0;
-    const OutputType change_type = wallet.TransactionChangeType(coin_control.m_change_type ? *coin_control.m_change_type : wallet.m_default_change_type, vecSend);
-    ReserveDestination reservedest(&wallet, change_type);
     unsigned int outputs_to_subtract_fee_from = 0; // The number of outputs which we are subtracting the fee from
     for (const auto& recipient : vecSend) {
         if (recipient.nAmount < 0) return util::Error{_("Transaction amounts must not be negative")};
@@ -799,23 +797,21 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
 
     // Create change script that will be used if we need change
     CScript scriptChange;
+    std::unique_ptr<ReserveDestination> op_reservedest;
     bilingual_str error; // possible error str
 
     // coin control: send change to custom address
     if (!std::get_if<CNoDestination>(&coin_control.destChange)) {
         scriptChange = GetScriptForDestination(coin_control.destChange);
-    } else { // no coin control: send change to newly generated address
-        // Note: We use a new key here to keep it from being obvious which side is the change.
-        //  The drawback is that by not reusing a previous key, the change may be lost if a
-        //  backup is restored, if the backup doesn't have the new private key for the change.
-        //  If we reused the old key, it would be possible to add code to look for and
-        //  rediscover unknown transactions that were written with keys of ours to recover
-        //  post-backup change.
+    } else {
+        // No coin control: send change to newly generated address
 
         // Reserve a new key pair from key pool. If it fails, provide a dummy
         // destination in case we don't need change.
+        const OutputType change_type = wallet.TransactionChangeType(coin_control.m_change_type ? *coin_control.m_change_type : wallet.m_default_change_type, vecSend);
+        op_reservedest = std::make_unique<ReserveDestination>(&wallet, change_type);
         CTxDestination dest;
-        auto op_dest = reservedest.GetReservedDestination(true);
+        auto op_dest = op_reservedest->GetReservedDestination(true);
         if (!op_dest) {
             error = _("Transaction needs a change address, but we can't generate it.") + Untranslated(" ") + util::ErrorString(op_dest);
         } else {
@@ -1032,7 +1028,7 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
 
     // Before we return success, we assume any change key will be used to prevent
     // accidental re-use.
-    reservedest.KeepDestination();
+    if (op_reservedest) op_reservedest->KeepDestination();
 
     wallet.WalletLogPrintf("Fee Calculation: Fee:%d Bytes:%u Tgt:%d (requested %d) Reason:\"%s\" Decay %.5f: Estimation: (%g - %g) %.2f%% %.1f/(%.1f %d mem %.1f out) Fail: (%g - %g) %.2f%% %.1f/(%.1f %d mem %.1f out)\n",
               nFeeRet, nBytes, feeCalc.returnedTarget, feeCalc.desiredTarget, StringForFeeReason(feeCalc.reason), feeCalc.est.decay,

@@ -787,6 +787,8 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     ReserveDestination reservedest(&wallet, change_type);
     unsigned int outputs_to_subtract_fee_from = 0; // The number of outputs which we are subtracting the fee from
     for (const auto& recipient : vecSend) {
+        if (recipient.nAmount < 0) return util::Error{_("Transaction amounts must not be negative")};
+
         recipients_sum += recipient.nAmount;
 
         if (recipient.fSubtractFeeFromAmount) {
@@ -1052,10 +1054,6 @@ util::Result<CreatedTransactionResult> CreateTransaction(
 {
     if (vecSend.empty()) {
         return util::Error{_("Transaction must have at least one recipient")};
-    }
-
-    if (std::any_of(vecSend.cbegin(), vecSend.cend(), [](const auto& recipient){ return recipient.nAmount < 0; })) {
-        return util::Error{_("Transaction amounts must not be negative")};
     }
 
     LOCK(wallet.cs_wallet);

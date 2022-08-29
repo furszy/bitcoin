@@ -48,32 +48,6 @@ CAmount TxGetCredit(const CWallet& wallet, const CTransaction& tx, const isminef
     return nCredit;
 }
 
-/**
- * Uses the address book to return whether the script is change or not.
- * Based on the naive assumption that any entry in the address book without a label is a change address.
- */
-bool ScriptIsChangeOld(const CWallet& wallet, const CScript& script) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet)
-{
-    // TODO: fix handling of 'change' outputs. The assumption is that any
-    // payment to a script that is ours, but is not in the address book
-    // is change. That assumption is likely to break when we implement multisignature
-    // wallets that return change back into a multi-signature-protected address;
-    // a better way of identifying which outputs are 'the send' and which are
-    // 'the change' will need to be implemented (maybe extend CWalletTx to remember
-    // which output, if any, was change).
-    AssertLockHeld(wallet.cs_wallet);
-    if (wallet.IsMine(script))
-    {
-        CTxDestination address;
-        if (!ExtractDestination(script, address))
-            return true;
-        if (!wallet.FindAddressBookEntry(address)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool ScriptIsChange(const CWallet& wallet, const CScript& script)
 {
     AssertLockHeld(wallet.cs_wallet);
@@ -111,8 +85,10 @@ bool ScriptIsChange(const CWallet& wallet, const CScript& script)
             }
         }
 
-        // HD wallet not enabled or no key origin, use the address book as last resource fallback.
-        return ScriptIsChangeOld(wallet, script);
+        // HD wallet not enabled or no key origin (legacy behaviour):
+        // As last resource fallback for legacy wallets, use the address book data to return whether the script is change or not.
+        // This is based on the naive assumption that any entry in the address book without a label is a change destination.
+        return wallet.FindAddressBookEntry(dest, /*allow_change=*/true)->IsChange();
     }
 }
 

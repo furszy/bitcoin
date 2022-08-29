@@ -2111,6 +2111,19 @@ SigningResult CWallet::SignMessage(const std::string& message, const PKHash& pkh
     return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
 }
 
+/**
+ * The transaction change type priority is the following one:
+ *
+ * 1) If the user provided change type, use selected change type.
+ * 2) Use legacy type if the wallet default address type is legacy.
+ * 3) taproot if at least one recipient is taproot type.
+ * 4) p2wpkh if at least one recipient is p2wpkh type.
+ * 5) p2sh(p2wpkh) if at least one recipient is a p2sh.
+ * 6) p2pkh if at least one recipient is p2pkh type.
+ * 7) if have taproot spkm, return taproot change addr.
+ * 8) if have p2wpkh spkm, return segwit change addr.
+ * 9) if none of the above, return the wallet default address type.
+ */
 OutputType CWallet::TransactionChangeType(const std::optional<OutputType>& change_type, const std::vector<CRecipient>& vecSend) const
 {
     // If -changetype is specified, always use that change type.
@@ -3305,13 +3318,20 @@ std::set<ScriptPubKeyMan*> CWallet::GetActiveScriptPubKeyMans() const
     return spk_mans;
 }
 
-std::set<ScriptPubKeyMan*> CWallet::GetAllScriptPubKeyMans() const
+std::set<ScriptPubKeyMan*> CWallet::GetAllScriptPubKeyMans(bool only_internal) const
 {
     std::set<ScriptPubKeyMan*> spk_mans;
-    for (const auto& spk_man_pair : m_spk_managers) {
-        spk_mans.insert(spk_man_pair.second.get());
+    if (only_internal) {
+        for (const auto& spk_man_pair : m_internal_spk_managers) {
+            spk_mans.insert(spk_man_pair.second);
+        }
+        return spk_mans;
+    } else {
+        for (const auto &spk_man_pair: m_spk_managers) {
+            spk_mans.insert(spk_man_pair.second.get());
+        }
+        return spk_mans;
     }
-    return spk_mans;
 }
 
 ScriptPubKeyMan* CWallet::GetScriptPubKeyMan(const OutputType& type, bool internal) const

@@ -85,12 +85,12 @@ static void PrevectorDeserialize(benchmark::Bench& bench)
     {                                                                \
         Prevector##name<nontrivial_t>(bench);                        \
     }                                                                \
-    BENCHMARK(Prevector##name##Nontrivial);                          \
+    BENCHMARK(Prevector##name##Nontrivial, benchmark::HIGH);         \
     static void Prevector##name##Trivial(benchmark::Bench& bench)    \
     {                                                                \
         Prevector##name<trivial_t>(bench);                           \
     }                                                                \
-    BENCHMARK(Prevector##name##Trivial);
+    BENCHMARK(Prevector##name##Trivial, benchmark::HIGH);
 
 PREVECTOR_TEST(Clear)
 PREVECTOR_TEST(Destructor)

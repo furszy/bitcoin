@@ -133,7 +133,7 @@ static void AddrManAddThenGood(benchmark::Bench& bench)
     });
 }
 
-BENCHMARK(AddrManAdd);
-BENCHMARK(AddrManSelect);
-BENCHMARK(AddrManGetAddr);
-BENCHMARK(AddrManAddThenGood);
+BENCHMARK(AddrManAdd, benchmark::HIGH);
+BENCHMARK(AddrManSelect, benchmark::HIGH);
+BENCHMARK(AddrManGetAddr, benchmark::HIGH);
+BENCHMARK(AddrManAddThenGood, benchmark::HIGH);

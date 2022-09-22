@@ -96,5 +96,5 @@ static void VerifyNestedIfScript(benchmark::Bench& bench)
     });
 }
 
-BENCHMARK(VerifyScriptBench);
-BENCHMARK(VerifyNestedIfScript);
+BENCHMARK(VerifyScriptBench, benchmark::HIGH);
+BENCHMARK(VerifyNestedIfScript, benchmark::HIGH);

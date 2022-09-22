@@ -114,5 +114,5 @@ static void MempoolCheck(benchmark::Bench& bench)
     });
 }
 
-BENCHMARK(ComplexMemPool);
-BENCHMARK(MempoolCheck);
+BENCHMARK(ComplexMemPool, benchmark::HIGH);
+BENCHMARK(MempoolCheck, benchmark::HIGH);

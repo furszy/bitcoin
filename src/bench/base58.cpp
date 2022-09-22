@@ -50,6 +50,6 @@ static void Base58Decode(benchmark::Bench& bench)
 }
 
 
-BENCHMARK(Base58Encode);
-BENCHMARK(Base58CheckEncode);
-BENCHMARK(Base58Decode);
+BENCHMARK(Base58Encode, benchmark::HIGH);
+BENCHMARK(Base58CheckEncode, benchmark::HIGH);
+BENCHMARK(Base58Decode, benchmark::HIGH);

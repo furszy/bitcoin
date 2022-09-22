@@ -41,15 +41,40 @@ void GenerateTemplateResults(const std::vector<ankerl::nanobench::Result>& bench
 
 } // namespace
 
+benchmark::BenchPriorityLevel benchmark::ToPriorityLevel(const std::string& str)
+{
+    if (str == "high") {
+        return HIGH;
+    } else if (str == "medium") {
+        return MEDIUM;
+    } else if (str == "low") {
+        return LOW;
+    }
+    throw std::runtime_error("Unknown priority level");
+}
+
+std::string benchmark::PriorityToString(BenchPriorityLevel level)
+{
+    switch (level) {
+        case HIGH:
+            return "high";
+        case MEDIUM:
+            return "medium";
+        case LOW:
+            return "low";
+    }
+    throw std::runtime_error("Unknown priority level");
+}
+
 benchmark::BenchRunner::BenchmarkMap& benchmark::BenchRunner::benchmarks()
 {
-    static std::map<std::string, BenchFunction> benchmarks_map;
+    static std::map<BenchPriorityLevel, std::map<std::string, BenchFunction>> benchmarks_map;
     return benchmarks_map;
 }
 
-benchmark::BenchRunner::BenchRunner(std::string name, benchmark::BenchFunction func)
+benchmark::BenchRunner::BenchRunner(std::string name, benchmark::BenchFunction func, BenchPriorityLevel level)
 {
-    benchmarks().insert(std::make_pair(name, func));
+    benchmarks()[level].insert(std::make_pair(name, func));
 }
 
 void benchmark::BenchRunner::RunAll(const Args& args)
@@ -62,7 +87,7 @@ void benchmark::BenchRunner::RunAll(const Args& args)
     }
 
     std::vector<ankerl::nanobench::Result> benchmarkResults;
-    for (const auto& p : benchmarks()) {
+    for (const auto& p : benchmarks()[args.priority_level]) {
         if (!std::regex_match(p.first, baseMatch, reFilter)) {
             continue;
         }

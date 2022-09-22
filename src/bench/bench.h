@@ -41,6 +41,16 @@ using ankerl::nanobench::Bench;
 
 typedef std::function<void(Bench&)> BenchFunction;
 
+enum BenchPriorityLevel
+{
+    HIGH,
+    MEDIUM,
+    LOW
+};
+
+BenchPriorityLevel ToPriorityLevel(const std::string& str);
+std::string PriorityToString(BenchPriorityLevel level);
+
 struct Args {
     bool is_list_only;
     bool sanity_check;
@@ -49,22 +59,23 @@ struct Args {
     fs::path output_csv;
     fs::path output_json;
     std::string regex_filter;
+    BenchPriorityLevel priority_level{HIGH};
 };
 
 class BenchRunner
 {
-    typedef std::map<std::string, BenchFunction> BenchmarkMap;
+    typedef std::map<BenchPriorityLevel, std::map<std::string, BenchFunction>> BenchmarkMap;
     static BenchmarkMap& benchmarks();
 
 public:
-    BenchRunner(std::string name, BenchFunction func);
+    BenchRunner(std::string name, BenchFunction func, BenchPriorityLevel level);
 
     static void RunAll(const Args& args);
 };
 } // namespace benchmark
 
-// BENCHMARK(foo) expands to:  benchmark::BenchRunner bench_11foo("foo", foo);
+// BENCHMARK(foo) expands to:  benchmark::BenchRunner bench_11foo("foo", foo, priority_level);
 #define BENCHMARK(n) \
-    benchmark::BenchRunner PASTE2(bench_, PASTE2(__LINE__, n))(STRINGIZE(n), n);
+    benchmark::BenchRunner PASTE2(bench_, PASTE2(__LINE__, n))(STRINGIZE(n), n, benchmark::BenchPriorityLevel::HIGH);
 
 #endif // BITCOIN_BENCH_BENCH_H
